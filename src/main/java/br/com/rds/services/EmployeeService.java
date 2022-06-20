@@ -11,8 +11,8 @@ import br.com.rds.repository.EmployeeRepository;
 import br.com.rds.repository.model.Employee;
 import lombok.extern.slf4j.Slf4j;
 
-@Service
 @Slf4j
+@Service
 public class EmployeeService {
 
   @Autowired
@@ -21,26 +21,26 @@ public class EmployeeService {
   // Read data from read replicas
   @Transactional(readOnly = true)
   public List<Employee> getEmployees() {
-    
+
     log.info("Getting all employees");
-    
+
     return this.repository.findAll();
   }
 
-  //Read data from read replicas
+  // Read data from read replicas
   @Transactional(readOnly = true)
   public Optional<Employee> getEmployeeById(long id) {
-   
+
     log.info("Getting employee by id {}", id);
-    
+
     return this.repository.findById(id);
   }
 
   @Transactional
   public Employee createEmployee(Employee employee) {
-    
+
     log.info("Saving {}", employee);
-    
+
     return this.repository.save(employee);
   }
 
