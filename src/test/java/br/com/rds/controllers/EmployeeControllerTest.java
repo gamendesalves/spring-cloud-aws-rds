@@ -1,80 +1,79 @@
 package br.com.rds.controllers;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import java.util.Optional;
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
+import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
+import org.springframework.test.context.jdbc.Sql;
+import org.springframework.test.context.jdbc.Sql.ExecutionPhase;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import br.com.rds.controllers.dto.EmployeeDTO;
 import br.com.rds.repository.model.Employee;
-import br.com.rds.services.EmployeeService;
 
 @ExtendWith(SpringExtension.class)
-@WebMvcTest(controllers = EmployeeController.class)
+@SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
+@Sql(scripts = "/create-data.sql")
+@Sql(scripts = "/cleanup-data.sql", executionPhase = ExecutionPhase.AFTER_TEST_METHOD)
 class EmployeeControllerTest {
 
-  @Autowired
-  private MockMvc mockMvc;
+  @LocalServerPort
+  private int port;
 
-  @MockBean
-  private EmployeeService service;
+  @Autowired
+  private TestRestTemplate restTemplate;
 
   @Test
   void testGetEmployees_thenReturns200() throws Exception {
 
-    MvcResult mvcResult = mockMvc.perform(get("/employee")
-                                 .contentType("application/json"))
-                                 .andExpect(status().isOk())
-                                 .andReturn();
+    ResponseEntity<List<Employee>> employees = this.restTemplate.exchange(this.getUrl(), HttpMethod.GET, null,
+        new ParameterizedTypeReference<List<Employee>>() {
+        });
 
-    assertNotNull(mvcResult.getResponse());
+    assertFalse(employees.getBody().isEmpty());
+
+  }
+
+  @Test
+  void testCreateEmployee_thenReturns200() throws Exception {
+
+    EmployeeDTO dto = new EmployeeDTO("Pedro", "Mendes");
+
+    HttpHeaders headers = new HttpHeaders();
+    headers.set("Content-Type", "application/json");
+
+    HttpEntity<EmployeeDTO> request = new HttpEntity<>(dto, headers);
+
+    ResponseEntity<Employee> employeeCreated = this.restTemplate.postForEntity(this.getUrl(), request, Employee.class);
+
+    assertNotNull(employeeCreated);
+
   }
 
   @Test
   void testGetEmployeeById_thenReturns200() throws Exception {
 
-    when(service.getEmployeeById(1)).thenReturn(Optional.of(new Employee()));
+    ResponseEntity<Employee> employee = this.restTemplate.getForEntity(this.getUrl() + "/1", Employee.class);
 
-    MvcResult mvcResult = mockMvc.perform(get("/employee/{id}", "1")
-                                 .contentType("application/json"))
-                                 .andExpect(status().isOk())
-                                 .andReturn();
+    assertNotNull(employee);
 
-    assertNotNull(mvcResult.getResponse());
   }
 
-  @Test
-  void testCreateEmployee_thenReturns201() throws Exception {
-
-    MvcResult mvcResult = mockMvc.perform(post("/employee")
-                                 .contentType("application/json")
-                                 .content(this.asJsonString(new EmployeeDTO("Gabriel", "Alves"))))
-                                 .andExpect(status().isCreated())
-                                 .andReturn();
-
-    assertNotNull(mvcResult.getResponse());
-  }
-
-  private String asJsonString(final Object dto) {
-    try {
-      return new ObjectMapper().writeValueAsString(dto);
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
+  private String getUrl() {
+    return "http://localhost:" + port + "/employee";
   }
 
 }
